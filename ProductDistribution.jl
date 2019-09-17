@@ -3,8 +3,8 @@ include("DataReader.jl")
 include("SubcycleChecker.jl")
 
 function main()
-    d, n, m = read_data()
-    @time product_distribution(d, n, m)
+    n, m, d, op, cl = read_data("data8")
+    @time product_distribution(n, m, d, op, cl)
 end
 
 """
@@ -16,7 +16,7 @@ end
 - `n::Int`: number of clients
 - `m::Int`: number of days of work
 """
-function product_distribution(d, n, m)
+function product_distribution(n, m, d, op, cl)
     println("Criando modelo...")
     model = Model(with_optimizer(Cbc.Optimizer, logLevel = 0))
     @variable(model, x[k = 1:m, i = 0:n, j = 1:n + 1], Bin)
@@ -40,37 +40,50 @@ function product_distribution(d, n, m)
     @constraint(model, stickCons[k = 1:m, i = 1:n, j = i+1:n; i != j], x[k, i, j] + x[k, j, i] <= 1)
     println("Resolvendo modelo...")
 
-    # mtz constraints
-    @variable(model, 1 <= u[1:n] <= n)
-    @constraint(model, u[1] == 1)
-    @constraint(model, mtz[i = 1:n, j = 1:n; i != j], u[i] - u[j] + n*sum(x[k, i, j] for k in 1:m) <= (n-1))
+    # Restrições de janelas de tempo
+    @variable(model, s[k = 1:m, i = 0:n+1])
+    # M = maximum((cl[i] + d[k, i, j] - op[j]) for k = 1:m, i = 0:n, j = 1:n+1 if i != j)
+    M = 2000
+    @constraint(model, timeRel[k = 1:m, i=0:n, j=1:n+1; i != j], s[k, i] + d[k, i, j] - M*(1 - x[k, i, j]) <= s[k, j])
+    @constraint(model, inTime[k = 1:m, i = 0:n+1], op[i] <= s[k, i] <= cl[i])
 
-    optimize!(model)
+
+    # mtz constraints
+    # @variable(model, 1 <= u[1:n] <= n)
+    # @constraint(model, u[1] == 1)
+    # @constraint(model, mtz[i = 1:n, j = 1:n; i != j], u[i] - u[j] + n*sum(x[k, i, j] for k in 1:m) <= (n-1))
+
+    # optimize!(model)
 
     # subcycles cut (exponencial formulation)
-    # while true
-    #     optimize!(model)
+    while true
+        optimize!(model)
+        status = termination_status(model)
+        if status != MOI.OPTIMAL
+            println("status: $status")
+            break
+        end
 
-    #     subcycles = checkForSubcycles(value.(x))
+        subcycles = checkForSubcycles(value.(x))
 
-    #     if length(subcycles) > 0
-    #         println("Subcycles found: $(subcycles)")
+        if length(subcycles) > 0
+            println("Subcycles found: $(subcycles)")
 
-    #         for t in subcycles
-    #             S = t[2]
-    #             sumArcs = AffExpr()
-    #             for k = 1:m, i in S, j in S
-    #                 if i != j
-    #                     add_to_expression!(sumArcs, 1.0, x[k, i, j])
-    #                 end
-    #             end
-    #             @constraint(model, sumArcs <= length(S) - 1)
-    #         end
-    #     else
-    #         break
-    #     end
+            for t in subcycles
+                S = t[2]
+                sumArcs = AffExpr()
+                for k = 1:m, i in S, j in S
+                    if i != j
+                        add_to_expression!(sumArcs, 1.0, x[k, i, j])
+                    end
+                end
+                @constraint(model, sumArcs <= length(S) - 1)
+            end
+        else
+            break
+        end
 
-    # end
+    end
 
     for k = 1:m
         println("Dia $k:")
