@@ -7,7 +7,7 @@ function readData(name)
     if isfile("$name.srl")
         println("$name.srl encontrado!")
         data = deserialize("$name.srl")
-        return data['n'], data['m'], data['d'], data["op"], data["cl"]
+        return data['n'], data['m'], data['d'], data["op"], data["cl"], data['a']
     end
 
     clients_file = CSV.file("$(name)_clients.csv")
@@ -17,6 +17,10 @@ function readData(name)
     n = length(clients_coordinates) # numero de clientes
     clients_op = getTimes(clients_file.opening_time)
     clients_cl = getTimes(clients_file.closing_time)
+    clients_a = clients_file.service_time
+    a = Dict([i => clients_a[i] for i = 1:length(clients_a)])
+    a[0] = 0 # origem não tem tempo de atendimento
+    a[n+1] = 0 # nem destino
 
     days_file = CSV.file("$(name)_days.csv")
     start_coordinates = days_file.start_coordinates
@@ -44,10 +48,10 @@ function readData(name)
     end
 
 
-    data = Dict(['n' => n, 'm' => m, 'd' => d, "op" => op, "cl" => cl])
+    data = Dict(['n' => n, 'm' => m, 'd' => d, "op" => op, "cl" => cl, 'a' => a])
     serialize("$name.srl", data)
 
-    return n, m, d, op, cl
+    return n, m, d, op, cl, a
 end
 
 function getDurations(coordinates)

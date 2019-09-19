@@ -3,8 +3,8 @@ include("DataReader.jl")
 include("SubcycleChecker.jl")
 
 function main()
-    n, m, d, op, cl = readData("data10")
-    routes = @time productDistribution(n, m, d, op, cl)
+    n, m, d, op, cl, a = readData("data10")
+    routes = @time productDistribution(n, m, d, op, cl, a)
     printRoutes(routes)
 end
 
@@ -17,7 +17,7 @@ end
 - `n::Int`: number of clients
 - `m::Int`: number of days of work
 """
-function productDistribution(n, m, d, op, cl)
+function productDistribution(n, m, d, op, cl, a)
     formulation = "with_time_windows"
 
     println("Criando modelo...")
@@ -45,8 +45,8 @@ function productDistribution(n, m, d, op, cl)
 
     if formulation == "with_time_windows"
         # Restrições de janelas de tempo
-        @variable(model, op[k, i] <= s[k = 1:m, i = 0:n+1] <= cl[k, i])
-        @constraint(model, timeRel[k = 1:m, i=0:n, j=1:n+1; i != j], s[k, i] + d[k, i, j] - 1440*(1 - x[k, i, j]) <= s[k, j])
+        @variable(model, op[k, i] <= s[k = 1:m, i = 0:n+1] <= cl[k, i] - a[i])
+        @constraint(model, timeRel[k = 1:m, i=0:n, j=1:n+1; i != j], s[k, i] + a[i] + d[k, i, j] - 1440*(1 - x[k, i, j]) <= s[k, j])
 
         optimize!(model)
 
