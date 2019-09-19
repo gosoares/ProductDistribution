@@ -1,7 +1,7 @@
 using Serialization
 import CSV, HTTP, JSON
 
-function read_data(name)
+function readData(name)
     println("Lendo dados... ")
 
     if isfile("$name.srl")
@@ -10,40 +10,59 @@ function read_data(name)
         return data['n'], data['m'], data['d'], data["op"], data["cl"]
     end
 
-    file = CSV.file("$name.csv")
+    clients_file = CSV.file("$(name)_clients.csv")
 
     # le as coordenadas e transforma no formato aceito pelo OSRM
-    coordinates = [join(reverse(split(row.coordinates, ',')), ',') for row in file]
-    push!(coordinates, coordinates[1]) # a principio, inicio e fim das rotas são no deposito
-    coordsString = join(coordinates, ';')
+    clients_coordinates = clients_file.coordinates
+    n = length(clients_coordinates) # numero de clientes
+    clients_op = getTimes(clients_file.opening_time)
+    clients_cl = getTimes(clients_file.closing_time)
 
-    # obtem a matriz de 'distancias' pelo osrm
-    r = HTTP.get("http://router.project-osrm.org/table/v1/driving/$coordsString")
-    responseBody = JSON.parse(String(r.body))
-    durations = responseBody["durations"]
+    days_file = CSV.file("$(name)_days.csv")
+    start_coordinates = days_file.start_coordinates
+    dest_coordinates = days_file.dest_coordinates
+    m = length(start_coordinates) # numero de dias
+    start_op = getTimes(days_file.start_opening_time)
+    start_cl = getTimes(days_file.start_closing_time)
+    dest_op = getTimes(days_file.dest_opening_time)
+    dest_cl = getTimes(days_file.dest_closing_time)
+    zeroTime = minimum(start_op)
 
-    # cria a matriz d
-    n = length(durations) - 2 # numero de clientes
-    m = 5 # numero de dias de trabalho
-    d = Dict([(k, i, j)=> durations[i+1][j+1] / 60 for k in 1:m, i in 0:n+1, j in 0:n+1 if i != j])
+    d = Dict{Tuple{Int, Int, Int}, Float64}()
+    op = Dict{Tuple{Int, Int}, Int}()
+    cl = Dict{Tuple{Int, Int}, Int}()
+    for k = 1:m
+        day_coordinates = vcat([start_coordinates[k]], clients_coordinates, [dest_coordinates[k]])
+        durations = getDurations(day_coordinates)
+        d = merge(d, Dict([(k, i, j) => durations[i+1][j+1] / 60 for i = 0:n, j = 1:n+1 if i != j ]))
+        
+        op_times = vcat([start_op[k]], clients_op, [dest_op[k]])
+        op = merge(op, Dict([(k, i) => op_times[i+1] - zeroTime for i in 0:n+1]))
 
-    # obtem horarios de abertura
-    op = [split(t, ":") for t in file.opening_time]
-    push!(op, op[1]) # inicio e fim no deposito
-    op = [parse(Int, t[1]) * 60 + parse(Int, t[2]) for t in op] # transforma hora em minutos a partir das 00:00
-    zeroTime = op[1] # tempo 0 eh o tempo de abertura do deposito
-    op = [max(0, t - zeroTime) for t in op] # tempo de abertura em relação ao tempo de abertura do deposito
-    op = Dict([i => op[i+1] for i in 0:n+1]) # indexado do 0
+        cl_times = vcat([start_cl[k]], clients_cl, [dest_cl[k]])
+        cl = merge(cl, Dict([(k, i) => cl_times[i+1] - zeroTime for i in 0:n+1]))
+    end
 
-    # obtem horarios de fechamento
-    cl = [split(t, ":") for t in file.closing_time]
-    push!(cl, cl[1]) # inicio e fim no deposito
-    cl = [parse(Int, t[1]) * 60 + parse(Int, t[2]) for t in cl] # transforma hora em minutos a partir das 00:00
-    cl = [min(cl[1] - zeroTime, t - zeroTime) for t in cl] # tempo de fechamento em relação ao tempo de abertura do deposito
-    cl = Dict([i => cl[i+1] for i in 0:n+1]) # indexicado do 0
 
     data = Dict(['n' => n, 'm' => m, 'd' => d, "op" => op, "cl" => cl])
     serialize("$name.srl", data)
 
     return n, m, d, op, cl
+end
+
+function getDurations(coordinates)
+    coordinates = [join(reverse(split(c, ',')), ',') for c in coordinates]
+    coordsString = join(coordinates, ';')
+
+    # obtem a matriz de tempos pelo osrm
+    r = HTTP.get("http://router.project-osrm.org/table/v1/driving/$coordsString")
+    responseBody = JSON.parse(String(r.body))
+    durations = responseBody["durations"]
+    return durations
+end
+
+function getTimes(timesColumn)
+    op = [split(t, ":") for t in timesColumn]
+    op = [parse(Int, t[1]) * 60 + parse(Int, t[2]) for t in op] # transforma hora em minutos a partir das 00:00
+    return op
 end

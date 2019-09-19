@@ -3,8 +3,9 @@ include("DataReader.jl")
 include("SubcycleChecker.jl")
 
 function main()
-    n, m, d, op, cl = read_data("data8")
-    @time product_distribution(n, m, d, op, cl)
+    n, m, d, op, cl = readData("data10")
+    routes = @time productDistribution(n, m, d, op, cl)
+    printRoutes(routes)
 end
 
 """
@@ -16,7 +17,7 @@ end
 - `n::Int`: number of clients
 - `m::Int`: number of days of work
 """
-function product_distribution(n, m, d, op, cl)
+function productDistribution(n, m, d, op, cl)
     formulation = "with_time_windows"
 
     println("Criando modelo...")
@@ -44,7 +45,7 @@ function product_distribution(n, m, d, op, cl)
 
     if formulation == "with_time_windows"
         # Restrições de janelas de tempo
-        @variable(model, op[i] <= s[k = 1:m, i = 0:n+1] <= cl[i])
+        @variable(model, op[k, i] <= s[k = 1:m, i = 0:n+1] <= cl[k, i])
         @constraint(model, timeRel[k = 1:m, i=0:n, j=1:n+1; i != j], s[k, i] + d[k, i, j] - 1440*(1 - x[k, i, j]) <= s[k, j])
 
         optimize!(model)
@@ -95,18 +96,33 @@ function product_distribution(n, m, d, op, cl)
         println("Invalid Formulation")
     end
 
-    # printa arcos da solução
-    println()
+    # recupera solucao
+    routes = []
     for k = 1:m
-        println("Dia $k:")
-        for i = 0:n, j = 1:n+1
-            if i != j && value(x[k, i, j]) > 0.99
-                print("($i -> $j) ")
+        r = [0]
+        while r[end] != n+1
+            for j = 1:n+1
+                if r[end] != j && value(x[k, r[end], j]) > 0.99
+                    push!(r, j)
+                end
             end
         end
-        println("\n")
+        push!(routes, r)
     end
 
+    return routes
+
+end
+
+function printRoutes(routes)
+    for k in 1:length(routes)
+        route = routes[k]
+        print("Dia $k: $(route[1])")
+        for i in 2:length(route)
+            print(" -> $(route[i])")
+        end
+        println()
+    end
 end
 
 main()
