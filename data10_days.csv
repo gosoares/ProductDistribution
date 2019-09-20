@@ -1,4 +1,4 @@
-day,start_name,start_address,start_coordinates,start_opening_time,start_closing_time,,dest_name,dest_address,dest_coordinates,dest_opening_time,dest_closing_time
-Segunda,Depósito ,"Rua Melvin Jones, Bairro dos Ipês, S/N","-7.102936,-34.8592992",06:00:00,18:00:00,,Depósito ,"Rua Melvin Jones, Bairro dos Ipês, S/N","-7.102936,-34.8592992",06:00:00,18:00:00
-Terça,Depósito ,"Rua Melvin Jones, Bairro dos Ipês, S/N","-7.102936,-34.8592992",06:00:00,18:00:00,,Depósito ,"Rua Melvin Jones, Bairro dos Ipês, S/N","-7.102936,-34.8592992",06:00:00,18:00:00
-Quarta,Depósito ,"Rua Melvin Jones, Bairro dos Ipês, S/N","-7.102936,-34.8592992",06:00:00,18:00:00,,Depósito ,"Rua Melvin Jones, Bairro dos Ipês, S/N","-7.102936,-34.8592992",06:00:00,18:00:00
+day,start_name,start_address,start_coordinates,start_opening_time,start_closing_time,,dest_name,dest_address,dest_coordinates,dest_opening_time,dest_closing_time,,color
+Segunda,Depósito ,"Rua Melvin Jones, Bairro dos Ipês, S/N","-7.102936,-34.8592992",06:00:00,18:00:00,,Depósito ,"Rua Melvin Jones, Bairro dos Ipês, S/N","-7.102936,-34.8592992",06:00:00,18:00:00,,#FF0000
+Terça,Depósito ,"Rua Melvin Jones, Bairro dos Ipês, S/N","-7.102936,-34.8592992",06:00:00,18:00:00,,Depósito ,"Rua Melvin Jones, Bairro dos Ipês, S/N","-7.102936,-34.8592992",06:00:00,18:00:00,,#00FF00
+Quarta,Depósito ,"Rua Melvin Jones, Bairro dos Ipês, S/N","-7.102936,-34.8592992",06:00:00,18:00:00,,Depósito ,"Rua Melvin Jones, Bairro dos Ipês, S/N","-7.102936,-34.8592992",06:00:00,18:00:00,,#0000FF

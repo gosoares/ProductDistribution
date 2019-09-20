@@ -7,10 +7,17 @@ function readData(name)
     if isfile("$name.srl")
         println("$name.srl encontrado!")
         data = deserialize("$name.srl")
-        return data['n'], data['m'], data['d'], data["op"], data["cl"], data['a']
+        return data['n'], data['m'], data['d'], data["op"], data["cl"], data['a'], data["clientsData"], data["daysData"]
     end
 
     clients_file = CSV.file("$(name)_clients.csv")
+    clientsData = [
+        Dict([
+            "name" => row.name,
+            "address" => row.address,
+            "coordinates" => row.coordinates,
+        ]) for row in clients_file
+    ]
 
     # le as coordenadas e transforma no formato aceito pelo OSRM
     clients_coordinates = clients_file.coordinates
@@ -21,8 +28,21 @@ function readData(name)
     a = Dict([i => clients_a[i] for i = 1:length(clients_a)])
     a[0] = 0 # origem não tem tempo de atendimento
     a[n+1] = 0 # nem destino
+    
 
     days_file = CSV.file("$(name)_days.csv")
+    daysData = [
+        Dict([
+            "startName" => row.start_name,
+            "startAddress" => row.start_address,
+            "startCoordinates" => row.start_coordinates,
+            "destName" => row.dest_name,
+            "destAddress" =>  row.dest_address,
+            "destCoordinates" => row.dest_coordinates,
+            "color" => row.color,
+        ]) for row in days_file
+    ]
+
     start_coordinates = days_file.start_coordinates
     dest_coordinates = days_file.dest_coordinates
     m = length(start_coordinates) # numero de dias
@@ -48,10 +68,10 @@ function readData(name)
     end
 
 
-    data = Dict(['n' => n, 'm' => m, 'd' => d, "op" => op, "cl" => cl, 'a' => a])
+    data = Dict(['n' => n, 'm' => m, 'd' => d, "op" => op, "cl" => cl, 'a' => a, "clientsData" => clientsData, "daysData" => daysData])
     serialize("$name.srl", data)
 
-    return n, m, d, op, cl, a
+    return n, m, d, op, cl, a, clientsData, daysData
 end
 
 function getDurations(coordinates)

@@ -3,9 +3,10 @@ include("DataReader.jl")
 include("SubcycleChecker.jl")
 
 function main()
-    n, m, d, op, cl, a = readData("data10")
+    instance = "data10"
+    n, m, d, op, cl, a, clientsData, daysData = readData(instance)
     routes = @time productDistribution(n, m, d, op, cl, a)
-    printRoutes(routes)
+    printRoutes(instance, routes, clientsData, daysData)
 end
 
 """
@@ -114,8 +115,10 @@ function productDistribution(n, m, d, op, cl, a)
 
 end
 
-function printRoutes(routes)
-    for k in 1:length(routes)
+function printRoutes(instance, routes, clientsData, daysData)
+    m = length(routes)
+
+    for k in 1:m
         route = routes[k]
         print("Dia $k: $(route[1])")
         for i in 2:length(route)
@@ -123,6 +126,33 @@ function printRoutes(routes)
         end
         println()
     end
+    println()
+
+    rm("$(instance)_out", force = true, recursive = true)
+    mkdir("$(instance)_out")
+    for k in 1:m
+        open("$(instance)_out/day$k.csv", "w") do f
+            dayData = daysData[k]
+            startCoordinates = split(dayData["startCoordinates"], ',')
+            startCoordinates = [parse(Float64, s) for s in startCoordinates]
+            destCoordinates = split(dayData["destCoordinates"], ',')
+            destCoordinates = [parse(Float64, s) for s in destCoordinates]
+            color = dayData["color"]
+            route = routes[k]
+
+            write(f, "latitude,longitude,name,color,note\n") # headers
+            write(f, "$(startCoordinates[1]),$(startCoordinates[2]),\"$(dayData["startName"])\",$color,\"$(dayData["startAddress"])\"\n")
+
+            for i in 2:length(route)-1
+                c = clientsData[route[i]]
+                coords = [parse(Float64, s) for s in split(c["coordinates"], ',')]
+                write(f, "$(coords[1]),$(coords[2]),\"$(c["name"])\",$color,\"$(c["address"])\"\n")
+            end
+
+            write(f, "$(destCoordinates[1]),$(destCoordinates[2]),\"$(dayData["destName"])\",$color,\"$(dayData["destAddress"])\"\n")
+        end
+    end
+    
 end
 
 main()
