@@ -20,40 +20,56 @@ end
 """
 function productDistribution(n, m, d, op, cl, a)
     formulation = "with_time_windows"
+    f = n + 1
+
+    # conjuntos
+    C = [i for i in 1:n]
+    D = [i for i in 1:m]
+    P0 = [i for i in 0:n]
+    Pf = [i for i in 1:f]
+    P = [i for i in 0:f]
+    A = [(i, j) for i in P0, j in Pf if i != j]
 
     println("Criando modelo...")
     model = Model(with_optimizer(Cbc.Optimizer, logLevel = 0))
-    @variable(model, x[k = 1:m, i = 0:n, j = 1:n + 1], Bin)
+    @variable(model, x[k in D, i in P0, j in Pf; i != j], Bin)
 
     # Função objetivo - Minimizar distância percorrida na semana
-    @objective(model, Min, sum(d[k, i, j] * x[k, i, j] for k in 1:m, i in 0:n, j in 1:n+1 if i != j))
+    @objective(model, Min, sum(d[k, i, j] * x[k, i, j] for k in D, (i, j) in A))
 
     # Restrições (1) - o distribuidar deve visitar todo cliente, exatamente uma vez em algum dia
-    @constraint(model, inArcsCons[j = 1:n], sum(x[k, i, j] for k in 1:m, i in 0:n if i != j) == 1)
+    @constraint(model, inArcsCons[j in C], sum(x[k, i, j] for k in D, i in P0 if i != j) == 1)
 
     # Restrições (2) - se o distribuidor visitar um cliente, ele deve partir dele naquele mesmo dia
-    @constraint(model, outArcsCons[k=1:m, v = 1:n], sum(x[k, i, v] for i in 0:n if i != v) == sum(x[k, v, j] for j in 1:n+1 if j != v))
+    @constraint(model, outArcsCons[k in D, v in C], sum(x[k, i, v] for i in P0 if i != v) == sum(x[k, v, j] for j in Pf if j != v))
 
     # Restrições (3) - O distribuidor deve sair do ponto 0 todos os dias
-    @constraint(model, outOriginCons[k = 1:m], sum(x[k, 0, j] for j in 1:n) == 1)
+    @constraint(model, outOriginCons[k in D], sum(x[k, 0, j] for j in C) == 1)
 
-    # Restrições (4) - O distribuidor deve encerrar o trajeto no ponto n+1 todos os dias
-    @constraint(model, inFinalCons[k = 1:m], sum(x[k, i, n+1] for i in 1:n) == 1)
+    # Restrições (4) - O distribuidor deve encerrar o trajeto no ponto f todos os dias
+    @constraint(model, inFinalCons[k in D], sum(x[k, i, f] for i in C) == 1)
 
-    # Restrições (5) - Proibir subciclos de tamanho 2
-    @constraint(model, stickCons[k = 1:m, i = 1:n, j = i+1:n; i != j], x[k, i, j] + x[k, j, i] <= 1)
+    # Restrições (5) - não pode atender mais que (135/m)% dos clientes em um dia
+    @constraint(model, dayLimit[k in D], sum(x[k, i, j] for (i, j) in A) - 1 <= round((1.2/m)*n))
+
+    # Restrições (6) - Proibir subciclos de tamanho 2
+    @constraint(model, stickCons[k in D, i in C, j in C; j > i], x[k, i, j] + x[k, j, i] <= 1)
+
+    # @constraint(model, balacing[k1 in D, k2 in D; k1 != k2], 2*sum(d[k1, i, j]*x[k1, i, j] for (i, j) in A) >= sum(d[k2, i, j]*x[k2, i, j] for (i, j) in A)) 
+
     println("Resolvendo modelo...")
 
     if formulation == "with_time_windows"
         # Restrições de janelas de tempo
-        @variable(model, op[k, i] <= s[k = 1:m, i = 0:n+1] <= cl[k, i] - a[i])
-        @constraint(model, timeRel[k = 1:m, i=0:n, j=1:n+1; i != j], s[k, i] + a[i] + d[k, i, j] - 1440*(1 - x[k, i, j]) <= s[k, j])
-
+        @variable(model, op[k, i] <= s[k in D, i in P] <= cl[k, i] - a[i])
+        @constraint(model, timeRel[k in D, (i, j) in A], s[k, i] + a[i] + d[k, i, j] - 1440*(1 - x[k, i, j]) <= s[k, j])
+ 
         optimize!(model)
 
         status = termination_status(model)
         if status != MOI.OPTIMAL
             println("status: $status")
+            exit()
         end
     elseif formulation == "mtz"
         # mtz constraints
@@ -101,8 +117,8 @@ function productDistribution(n, m, d, op, cl, a)
     routes = []
     for k = 1:m
         r = [0]
-        while r[end] != n+1
-            for j = 1:n+1
+        while r[end] != f
+            for j = 1:f
                 if r[end] != j && value(x[k, r[end], j]) > 0.99
                     push!(r, j)
                 end
